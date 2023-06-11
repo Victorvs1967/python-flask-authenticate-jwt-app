@@ -10,7 +10,8 @@ class User:
     self.email = email
 
 class Note:
-  def __init__(self, title, body):
+  def __init__(self, title, body, author: User):
     self._id = str(uuid1().hex)
     self.title = title
     self.body = body
+    self.author = author
