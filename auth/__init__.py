@@ -17,38 +17,26 @@ def login():
   user = authenticate(username, password)
   if user:
     access_token = create_access_token(identity=username, expires_delta=False)
-    result = { 'token': access_token }
+    result = jsonify(token=access_token)
     return result
-  return { 'error': 'Invalid username and password' }
+  return jsonify(error='Invalid username and password')
+
+@app.route('/signup', methods=['POST'])
+def signup():
+  if db.user.find_one({ 'username': request.json['username'] }):
+    response = make_response(jsonify(message='User already exist'), 500)
+  elif db.user.find_one({ 'email': request.json['email'] }):
+    response = make_response(jsonify(message='Email already exist'), 500)
+  else:
+    user = create_user(request=request)
+    response = make_response(
+      jsonify(username=user.username, password=user.password, email=user.email), 201
+    )
+  response.headers['Content-Type'] = 'application/json'
+  return response
 
 def authenticate(username, password):
   user = db.user.find_one({ 'username': username })
   if user:
     if user.get('username') == username and check_password_hash(user.get('password'), password):
       return user
-
-@app.route('/signup', methods=['POST'])
-def signup():
-  if db.user.find_one({ 'username': request.json['username'] }):
-    response = make_response(
-      jsonify({
-        'message': 'User already exist',
-      }), 500
-    )
-  elif db.user.find_one({ 'email': request.json['email'] }):
-    response = make_response(
-      jsonify({
-        'message': 'Email already exist',
-      }), 500
-    )
-  else:
-    user = create_user(request=request)
-    response = make_response(
-      jsonify({
-        'username': user.username,
-        'password': user.password,
-        'email': user.email
-      }), 201
-    )
-  response.headers['Content-Type'] = 'application/json'
-  return response
