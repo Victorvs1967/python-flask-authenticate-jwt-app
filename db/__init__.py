@@ -2,7 +2,8 @@ from pymongo import MongoClient
 
 
 config = {
-  'host': 'localhost',
+  # 'host': 'localhost',
+  'host': 'mongo_db_host',
   'port': 27017,
   'username': '',
   'password': ''
