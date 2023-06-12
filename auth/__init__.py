@@ -1,12 +1,31 @@
-import base64
-from typing import Optional
-from functools import wraps
+from flask_jwt_extended import JWTManager, create_access_token
 from werkzeug.security import check_password_hash
 from flask import request, make_response, jsonify
 
-from models import User
 from app import app, db
+from services import create_user
 
+
+# secret string generated with: node -e "console.log(require('crypto').randomBytes(256).toString('base64'));"
+app.config['JWT_SECRET_KEY'] = 'yFFMnRnwPcDMyLLLSZF24/GN8SBqUu2dQCVpCirNVtP33EYWxgbL4OBKLFRHSosUGJSqb4ja9kZBP8WQ7HqXYjkdlUKFmSUlXGYXVZgiNS56l+uFLhKpfxThwfyuxIyyDYjYhm+FytTeOTuLo9K46sYg9D9qLT1rkphoPL152brOWecVBb+ExKKlmCoXSSiabOPJzSy/h6jZkBGQm4mVvrQ+HdDaevtTmEWJpc+oCDlIZYk5C5q/mEXglTMiPCqRQPXvE1GT+HeWtIWgJtj2fGnJudHmvYRBKmWJIp5mPVrvka447lKcW3GLI5FGVJdCQ1u3srOjcw/+62tqPKyUbw=='
+jwt = JWTManager(app)
+
+@app.route('/login', methods=['POST'])
+def login():
+  username = request.json['username']
+  password = request.json['password']
+  user = authenticate(username, password)
+  if user:
+    access_token = create_access_token(identity=username, expires_delta=False)
+    result = { 'token': access_token }
+    return result
+  return { 'error': 'Invalid username and password' }
+
+def authenticate(username, password):
+  user = db.user.find_one({ 'username': username })
+  if user:
+    if user.get('username') == username and check_password_hash(user.get('password'), password):
+      return user
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -33,56 +52,3 @@ def signup():
     )
   response.headers['Content-Type'] = 'application/json'
   return response
-
-# Middleware
-
-def is_authorized(user: Optional[User]) -> bool:
-  scheme, credentials = request.headers.get('Authorization').split()
-  decoded_credentials = base64.b64decode(credentials).decode()
-  _, password = decoded_credentials.split(':')
-
-  if not authenticate_user(user=user, password=password):
-    return False
-  return True
-
-def authenticate_user(user: Optional[User], password: str) -> bool:
-  if user is None:
-    return None
-  return check_password_hash(user.get('password'), password)
-
-def identify_user() -> Optional[User]:
-  scheme, credentials = request.headers.get('Authorization').split()
-  if not credentials:
-    return None
-
-  decoded_credentials = base64.b64decode(credentials).decode()
-  username, _ = decoded_credentials.split(':')
-  user = db.user.find_one({ 'username': username })
-  return user
-
-def authenticated_only(f):
-  @wraps(f)
-  def wrapper(*args, **kwargs):
-    user = identify_user()
-    scheme, credentials = request.headers.get('Authorization').split()
-    decoded_credentials = base64.b64decode(credentials).decode()
-    username, password = decoded_credentials.split(':')
-    is_authenticated = authenticate_user(user=user, password=password)
-
-    if not is_authenticated:
-      response = make_response(
-        jsonify({
-          'message': 'Credentials not valid',
-        }), 401
-      )
-      response.headers['Content-Type'] = 'application/json'
-      response.haders['WWW-Authenticate'] = 'Basic realm=notes_api'
-      return response
-
-    request.user = user
-    return f(*args, **kwargs)
-
-  return wrapper
-
-
-from services import create_user

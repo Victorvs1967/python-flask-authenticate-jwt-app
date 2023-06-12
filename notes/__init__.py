@@ -1,13 +1,13 @@
 from flask import request, make_response, jsonify
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from auth import authenticated_only
 from app import app
 
 
 @app.route('/notes', methods=['POST'])
-@authenticated_only
+@jwt_required()
 def create_note():
-  note = create_note(request=request, author=request.user)
+  note = create_note(request=request, author=get_jwt_identity())
   response = make_response(
     jsonify({
       'title': note.title,
